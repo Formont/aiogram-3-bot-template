@@ -17,7 +17,7 @@ async def main():
     dp.startup.register(on_startup)
     dp.update.middleware(DBMiddleware(session_maker))
     dp.include_router(setup_routers())
-    await bot.delete_webhook(drop_pending_updates=False)
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
