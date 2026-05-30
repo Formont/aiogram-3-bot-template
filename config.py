@@ -1,3 +1,5 @@
-TOKEN = "7385943908:AAHiwp0bukk3S74UxhBKYXUJhLknYmuAQ0A"
-ADMINS = [111]
+TOKEN = "777"
 DATABASE_URL = "sqlite+aiosqlite:///database.db"
+ADMINS = [111, 222]
+
+

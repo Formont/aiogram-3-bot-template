@@ -2,7 +2,7 @@ from aiogram import Router
 from aiogram.filters.chat_member_updated import ChatMemberUpdatedFilter, JOIN_TRANSITION, LEAVE_TRANSITION
 from aiogram.types import ChatMemberUpdated
 
-from db.engine import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from db import orm_queries as db
 
 router = Router()

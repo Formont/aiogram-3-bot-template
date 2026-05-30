@@ -5,4 +5,4 @@ from config import ADMINS
 
 class AdminFilter(BaseFilter):
     async def __call__(self, message: Message):
-        return message.from_user.id in ADMINS
+        return bool(message.from_user and message.from_user.id in ADMINS)
