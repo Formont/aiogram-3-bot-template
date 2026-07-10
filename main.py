@@ -1,4 +1,5 @@
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
 
 from bot.middlewares import DBMiddleware
 from bot.handlers import setup_routers
@@ -6,7 +7,7 @@ from db.engine import session_maker, create_tables
 from config import TOKEN
 import asyncio
 
-bot = Bot(TOKEN)
+bot = Bot(TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
 dp = Dispatcher()
 
 async def on_startup():

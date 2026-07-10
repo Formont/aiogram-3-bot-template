@@ -13,6 +13,3 @@ async def cmd_start(message: Message, session: AsyncSession):
     await db.add_user(session, message.from_user.id)
     await message.answer("Hello")
 
-@router.message(Command("admin"), AdminFilter())
-async def cmd_admin(message: Message, session: AsyncSession):
-    await message.answer("Hello, admin!")
