@@ -1,4 +1,4 @@
-from db.models import User
+from db.models import User, Sponsor, UserSponsor
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -62,3 +62,50 @@ async def set_blocked(session: AsyncSession, user_id: int, is_blocked: bool):
 async def get_all_active_user_ids(session: AsyncSession):
     users = await session.scalars(select(User.user_id).where(User.active == 1, User.is_blocked == False))
     return list(users)
+
+async def add_sponsor(session: AsyncSession, channel_id: int, channel_name: str, target_subs: int, invite_link: str):
+    sponsor = Sponsor(channel_id=channel_id, channel_name=channel_name, target_subs=target_subs, invite_link=invite_link)
+    session.add(sponsor)
+    await session.commit()
+    return sponsor
+
+async def get_active_sponsors(session: AsyncSession) -> list[Sponsor]:
+    result = await session.execute(select(Sponsor).where(Sponsor.is_active == True))
+    return list(result.scalars().all())
+
+async def get_all_sponsors(session: AsyncSession) -> list[Sponsor]:
+    result = await session.execute(select(Sponsor))
+    return list(result.scalars().all())
+
+async def get_active_sponsor_by_channel(session: AsyncSession, channel_id: int) -> Sponsor | None:
+    return await session.scalar(select(Sponsor).where(Sponsor.channel_id == channel_id, Sponsor.is_active == True))
+
+async def get_sponsor(session: AsyncSession, sponsor_id: int) -> Sponsor | None:
+    return await session.scalar(select(Sponsor).where(Sponsor.id == sponsor_id))
+
+async def delete_sponsor(session: AsyncSession, sponsor_id: int):
+    sponsor = await session.scalar(select(Sponsor).where(Sponsor.id == sponsor_id))
+    if sponsor:
+        await session.delete(sponsor)
+        await session.commit()
+
+async def check_user_sponsor_reward(session: AsyncSession, user_id: int, sponsor_id: int) -> bool:
+    # Check if user already rewarded this sponsor
+    existing = await session.scalar(
+        select(UserSponsor).where(UserSponsor.user_id == user_id, UserSponsor.sponsor_id == sponsor_id)
+    )
+    if existing:
+        return False
+        
+    # Record the reward
+    session.add(UserSponsor(user_id=user_id, sponsor_id=sponsor_id))
+    
+    # Increment current_subs
+    sponsor = await session.scalar(select(Sponsor).where(Sponsor.id == sponsor_id))
+    if sponsor:
+        sponsor.current_subs += 1
+        if sponsor.current_subs >= sponsor.target_subs:
+            sponsor.is_active = False
+            
+    await session.commit()
+    return True

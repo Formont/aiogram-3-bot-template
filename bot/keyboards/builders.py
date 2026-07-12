@@ -7,7 +7,8 @@ def build_admin_dashboard_kb():
         InlineKeyboardButton(text="👤 Управление юзерами", callback_data="admin_users")
     )
     builder.row(
-        InlineKeyboardButton(text="📢 Массовая рассылка", callback_data="admin_broadcast")
+        InlineKeyboardButton(text="📢 Массовая рассылка", callback_data="admin_broadcast"),
+        InlineKeyboardButton(text="🤝 Спонсоры (ОП)", callback_data="admin_sponsors")
     )
     return builder.as_markup()
 
@@ -47,3 +48,26 @@ def build_broadcast_message_kb(buttons_list: list):
     for btn in buttons_list:
         builder.row(InlineKeyboardButton(text=btn['text'], url=btn['url']))
     return builder.as_markup()
+
+def build_sub_check_kb(sponsors):
+    builder = InlineKeyboardBuilder()
+    for sponsor in sponsors:
+        builder.row(InlineKeyboardButton(text=f"Подписаться на {sponsor.channel_name}", url=sponsor.invite_link))
+    builder.row(InlineKeyboardButton(text="✅ Я подписался", callback_data="sub_verify_check"))
+    return builder.as_markup()
+
+def build_admin_sponsors_kb(sponsors):
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="➕ Добавить спонсора", callback_data="admin_sponsor_add"))
+    for sponsor in sponsors:
+        text = f"{sponsor.channel_name} [{sponsor.current_subs}/{sponsor.target_subs}]"
+        builder.row(InlineKeyboardButton(text=text, callback_data=f"admin_sponsor_view_{sponsor.id}"))
+    builder.row(InlineKeyboardButton(text="🔙 Назад в меню", callback_data="admin_back_to_main"))
+    return builder.as_markup()
+
+def build_admin_sponsor_view_kb(sponsor_id: int):
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="🗑 Удалить спонсора", callback_data=f"admin_sponsor_del_{sponsor_id}"))
+    builder.row(InlineKeyboardButton(text="🔙 Назад", callback_data="admin_sponsors"))
+    return builder.as_markup()
+

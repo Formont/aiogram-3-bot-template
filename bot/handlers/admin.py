@@ -5,8 +5,8 @@ from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.filters.adminFilter import AdminFilter
-from bot.keyboards.builders import build_admin_dashboard_kb, build_admin_users_kb, build_admin_back_kb, build_admin_user_card_kb
-from bot.states import AdminState
+from bot.keyboards.builders import build_admin_dashboard_kb, build_admin_users_kb, build_admin_back_kb, build_admin_user_card_kb, build_admin_sponsors_kb, build_admin_sponsor_view_kb
+from bot.states.userStates import AdminState, AdminSponsorState
 from db import orm_queries as db
 
 router = Router()
@@ -168,3 +168,113 @@ async def admin_action_unblock(callback: CallbackQuery, session: AsyncSession):
     )
     await callback.message.edit_text(text, reply_markup=build_admin_user_card_kb(user.user_id, False))
     await callback.answer("✅ Пользователь разблокирован")
+
+@router.callback_query(F.data == "admin_sponsors", AdminFilter())
+async def admin_sponsors_menu(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    await state.clear()
+    sponsors = await db.get_active_sponsors(session)
+    text = f"🤝 <b>Управление спонсорами (ОП)</b>\n\nАктивных спонсоров: {len(sponsors)}"
+    await callback.message.edit_text(text, reply_markup=build_admin_sponsors_kb(sponsors))
+    await callback.answer()
+
+@router.callback_query(F.data == "admin_sponsor_add", AdminFilter())
+async def admin_sponsor_add_start(callback: CallbackQuery, state: FSMContext):
+    text = (
+        "➕ <b>Добавление спонсора</b>\n\n"
+        "1️⃣ Добавьте этого бота в администраторы канала (с правом создания пригласительных ссылок).\n"
+        "2️⃣ Отправьте мне ID канала (например, -1001234567890) или перешлите любое сообщение из канала."
+    )
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    from aiogram.types import InlineKeyboardButton
+    builder = InlineKeyboardBuilder()
+    builder.row(InlineKeyboardButton(text="❌ Отмена", callback_data="admin_sponsors"))
+    await callback.message.edit_text(text, reply_markup=builder.as_markup())
+    await state.set_state(AdminSponsorState.waiting_for_channel)
+    await callback.answer()
+
+@router.message(AdminSponsorState.waiting_for_channel, AdminFilter())
+async def admin_sponsor_channel_process(message: Message, state: FSMContext):
+    channel_id = None
+    
+    if message.forward_from_chat and message.forward_from_chat.type == "channel":
+        channel_id = message.forward_from_chat.id
+    else:
+        try:
+            channel_id = int(message.text.strip())
+        except Exception:
+            pass
+            
+    if not channel_id:
+        await message.answer("⚠️ Не удалось определить ID канала. Попробуйте еще раз.")
+        return
+        
+    # Check bot permissions
+    try:
+        chat = await message.bot.get_chat(channel_id)
+        bot_member = await message.bot.get_chat_member(channel_id, message.bot.id)
+        if not bot_member.can_invite_users:
+            await message.answer(f"⚠️ У бота нет права приглашать пользователей в канале {chat.title}.")
+            return
+            
+        await state.update_data(channel_id=channel_id, channel_title=chat.title)
+        await message.answer(f"✅ Канал <b>{chat.title}</b> найден.\n\nВведите желаемое количество подписчиков (цель):")
+        await state.set_state(AdminSponsorState.waiting_for_target_subs)
+    except Exception as e:
+        await message.answer("⚠️ Ошибка проверки канала. Бот является админом там? Убедитесь в этом и в правильности ID.")
+
+@router.message(AdminSponsorState.waiting_for_target_subs, AdminFilter())
+async def admin_sponsor_subs_process(message: Message, session: AsyncSession, state: FSMContext):
+    try:
+        target_subs = int(message.text.strip())
+        if target_subs <= 0:
+            raise ValueError
+    except Exception:
+        await message.answer("⚠️ Введите положительное число.")
+        return
+        
+    data = await state.get_data()
+    channel_id = data['channel_id']
+    channel_title = data['channel_title']
+    
+    try:
+        # Generate invite link
+        invite = await message.bot.create_chat_invite_link(chat_id=channel_id, name="ОП Бот", creates_join_request=False)
+        
+        await db.add_sponsor(session, channel_id, channel_title, target_subs, invite.invite_link)
+        await message.answer(f"✅ Спонсор успешно добавлен!\nЦель: {target_subs} подписчиков.")
+    except Exception as e:
+        await message.answer(f"⚠️ Ошибка при создании ссылки-приглашения: {e}")
+        
+    await state.clear()
+    
+    # Show menu again
+    sponsors = await db.get_active_sponsors(session)
+    await message.answer(f"🤝 <b>Управление спонсорами (ОП)</b>\n\nАктивных спонсоров: {len(sponsors)}", reply_markup=build_admin_sponsors_kb(sponsors))
+
+@router.callback_query(F.data.startswith("admin_sponsor_view_"), AdminFilter())
+async def admin_sponsor_view(callback: CallbackQuery, session: AsyncSession):
+    sponsor_id = int(callback.data.split("_")[-1])
+    sponsor = await db.get_sponsor(session, sponsor_id)
+    if not sponsor:
+        await callback.answer("⚠️ Спонсор не найден", show_alert=True)
+        return
+        
+    text = (
+        f"📢 <b>Спонсор ID {sponsor.id}</b>\n\n"
+        f"Канал ID: <code>{sponsor.channel_id}</code>\n"
+        f"Прогресс: <b>{sponsor.current_subs} / {sponsor.target_subs}</b>\n"
+        f"Ссылка: {sponsor.invite_link}\n"
+        f"Статус: {'Активен' if sponsor.is_active else 'Выполнен'}"
+    )
+    await callback.message.edit_text(text, reply_markup=build_admin_sponsor_view_kb(sponsor.id))
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("admin_sponsor_del_"), AdminFilter())
+async def admin_sponsor_del(callback: CallbackQuery, session: AsyncSession):
+    sponsor_id = int(callback.data.split("_")[-1])
+    await db.delete_sponsor(session, sponsor_id)
+    await callback.answer("✅ Спонсор удален!", show_alert=True)
+    
+    sponsors = await db.get_active_sponsors(session)
+    text = f"🤝 <b>Управление спонсорами (ОП)</b>\n\nАктивных спонсоров: {len(sponsors)}"
+    await callback.message.edit_text(text, reply_markup=build_admin_sponsors_kb(sponsors))

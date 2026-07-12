@@ -7,3 +7,7 @@ class BroadcastState(StatesGroup):
     waiting_for_message = State()
     editing_broadcast = State()
     waiting_for_button = State()
+
+class AdminSponsorState(StatesGroup):
+    waiting_for_channel = State()
+    waiting_for_target_subs = State()
