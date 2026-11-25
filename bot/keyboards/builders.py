@@ -12,6 +12,13 @@ def build_admin_dashboard_kb():
     )
     return builder.as_markup()
 
+def build_invoice_keyboard(invoice):
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="Оплатить", url=invoice.bot_invoice_url)
+    )
+    return builder.as_markup()
+
 def build_admin_users_kb():
     builder = InlineKeyboardBuilder()
     builder.row(InlineKeyboardButton(text="🔍 Поиск пользователя", callback_data="admin_user_search"))

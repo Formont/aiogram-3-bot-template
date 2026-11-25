@@ -1,6 +1,38 @@
-from db.models import User, Sponsor, UserSponsor
+from db.models import User, Sponsor, UserSponsor, Payment
 from sqlalchemy import select, update, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+async def add_payment(
+    session: AsyncSession,
+    transaction_id: str,
+    user_id: int,
+    method: str,
+    paid_at,
+    amount: float,
+    currency: str,
+) -> bool:
+    """Save a payment idempotently; return True only for a new payment."""
+    existing = await session.get(Payment, transaction_id)
+    if existing:
+        return False
+    session.add(Payment(
+        transaction_id=transaction_id,
+        user_id=user_id,
+        method=method,
+        paid_at=paid_at,
+        amount=amount,
+        currency=currency,
+    ))
+    try:
+        await session.commit()
+    except Exception:
+        await session.rollback()
+        # A concurrent duplicate delivery may have inserted the same id.
+        if await session.get(Payment, transaction_id):
+            return False
+        raise
+    return True
 
 async def add_user(session: AsyncSession, user_id):
     user = await session.scalar(select(User).where(User.user_id == user_id))

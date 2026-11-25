@@ -32,3 +32,16 @@ class UserSponsor(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"))
     sponsor_id: Mapped[int] = mapped_column(Integer, ForeignKey("sponsors.id", ondelete="CASCADE"))
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    # CryptoPay does not expose a blockchain transaction hash for invoices;
+    # invoice_id is its unique payment/transaction identifier.
+    transaction_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.user_id", ondelete="CASCADE"), index=True)
+    method: Mapped[str] = mapped_column(String(32), default="cryptobot")
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    amount: Mapped[float] = mapped_column(FLOAT)
+    currency: Mapped[str] = mapped_column(String(16))

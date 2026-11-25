@@ -3,6 +3,8 @@ from bot.filters import NotBannedFilter
 
 def setup_routers():
     from . import cmds, actions, admin, broadcast, sub_verify
+    # Importing this module registers the CryptoPay polling event handler.
+    from bot.utils.payments import cryptobot  # noqa: F401
 
     router = Router()
     

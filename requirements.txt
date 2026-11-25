@@ -1,4 +1,4 @@
-aiogram>=3.0.0
-sqlalchemy>=2.0.0
-aiosqlite>=0.19.0
-
+aiogram>=3.31.0
+sqlalchemy>=2.1.6
+aiosqlite>=0.22.1
+aiosend>=3.0.8
